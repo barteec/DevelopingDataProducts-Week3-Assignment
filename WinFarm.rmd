@@ -1,0 +1,145 @@
+---
+title: "Developing-Data-Products-Week-2-Assignment"
+date: "02/05/2021"
+output: html_document
+    
+---
+
+### Data set
+The data used is from from an actual operating wind farm, but identifying info is removed. I used this data 
+from my current work. Source code and data located github [link](https://github.com/barteec/Developing-Data-Products-Week-2-Assignment) I have loaded
+this data into a folder called [datafiles](https://github.com/barteec/Developing-Data-Products-Week-2-Assignment). Please 
+be sure to load this file folder to you working directory. 
+
+Please make sure you have these libraries loaded:
+```{r warning=FALSE, message=FALSE}
+library(knitr)
+library(dplyr)
+library(leaflet)
+library(htmltools)
+library(kableExtra)
+library(lubridate)
+library(ggplot2)
+library(data.table)
+```
+
+```{r libraries, include=FALSE, echo=FALSE}
+library(knitr)
+library(dplyr)
+library(leaflet)
+library(htmltools)
+library(kableExtra)
+library(lubridate)
+library(ggplot2)
+library(data.table)
+
+setwd(getwd()) # will default to your WD
+#make sure you load the datafiles folder from github
+#Load data. Make sure you loaded the csv files from the github. 
+WinData <- read.csv(file = "./datafiles/WinData.csv")
+WinInfo <- read.csv(file = "./datafiles/WinInfo.csv")
+WinLoc <- read.csv(file = "./datafiles/WinLoc.csv")
+
+```
+
+## General Wind Farm Information and Map Location
+Below you will see general identifying information for a Wind Farm located in North Dakota, USA. I used the geo-tags 
+(lat,long) for each wind turbine. This wind farm was used to complete and show the ability to use R Markdown that features 
+a map created with Leaflet.
+
+Some things to take notice when viewing the map:
+
+* The R code is set to pick a random wind turbine of 56 in the wind farm to show as a red map icon, while all others are blue
+
+* Map is interactive where you can zoom in and out
+
+* If you are interested  in the wind turbines there is link in the Information table for you.
+
+```{r information table1, echo=FALSE, results="asis", warning=FALSE}
+cat(paste0("<table width='100%'><tr style='width:100%'>",
+           "<td style='width:50%;padding-right:10px;'>"))
+
+Parkdata <- data.table(WinInfo)
+Parkdata <- melt.data.table(Parkdata, id.vars = "ï..ID_WF")
+Parkdata <- setnames(Parkdata, c("variable", "value"), c("Category", "Information"))
+Parkdata <- Parkdata[,!1, with = F]
+
+
+kable(Parkdata, format = "markdown")
+cat("<font size='2'>*Data used is from an acutal operating wind farm but identifying info is removed.</font>")
+cat("</td>")
+
+```
+
+
+
+```{r map, results="asis", echo=FALSE}
+# ensure you loaded the folder icons from git hub
+turbinesFarmData <- data.table(WinLoc)
+
+cat("<td style='width:50%;padding-left:10px;'>")
+coloredIcons <- makeIcon(
+  iconUrl = ifelse(turbinesFarmData$Winturbine == paste("WTG", sample(1:56, 1)), #just picks random turbine to show in red
+                   "./datafiles/icons/red_icon.png",
+                   "./datafiles/icons/blue_icon.png"),
+                    iconWidth=25,
+                    iconHeight=43,
+                    iconAnchorX=17,
+                    iconAnchorY=38,
+                    popupAnchorX=1,
+                    popupAnchorY=-40
+                  )
+
+turbines <- turbinesFarmData %>% filter(!is.na(lat) & !is.na(long))
+
+map <-
+  leaflet() %>%
+  addProviderTiles(providers$Esri.NatGeoWorldMap)
+
+if (nrow(turbines) > 0) {
+  map <- addMarkers(map = map,
+                    data = turbines,
+                    ~ long,
+                    ~ lat,
+                    icon = coloredIcons,
+                    popup = paste(turbinesFarmData$ï..Wind.Farm,
+                                  turbinesFarmData$Winturbine,
+                                  sep="<br>"))
+}
+map$width <- "150%"
+map$height <- "450px"
+map
+cat("</td></tr></table>")
+```
+<div>
+
+
+## Plot to show the past year's Wind Speed vs Power Ouput
+Th plot below is a very basic representation of a power curve chart for a wind turbine. You will see how wind speed 
+and power are graphed against one another. You can see as wind speed increases the power output will increase (ramp up) 
+as well. The wind turbine will max out power output at 3 megawatts (mw) and will slow and/or stop producing power as 
+wind speed increases past 20 meters per second (m/s) 
+```{r echo=FALSE, results= 'asis', warning=FALSE, message = FALSE}
+#--- --- --- Wind Speed, power and temps
+
+Plot <- data.table(WinData)
+Plot <- setnames(Plot, "ï..ActivePowerAvg", "ActivePowerAvg")
+Plot <- Plot[ActivePowerAvg > 0]
+
+
+PKhc <- ggplot(Plot, aes(x = WindSpeedAvg, y= ActivePowerAvg)) + 
+        geom_point(shape = 18, color = "#8181F7")+
+        scale_x_discrete(limits = 0:30)+
+        scale_y_discrete(limits = seq(0, 3000, by=500))+
+        theme_light()+
+        labs(title = "Wind Speed vs Power Output",
+             subtitle = "power in mwh")+
+        theme(
+          plot.title = element_text(hjust = 0.5, size = 14),    # Center title position and size
+          plot.subtitle = element_text(hjust = 0.5),            # Center subtitle
+          plot.caption = element_text(hjust = 0, face = "italic"), # move caption to the left
+        )
+
+
+PKhc
+```
